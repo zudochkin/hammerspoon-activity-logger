@@ -39,6 +39,18 @@ local processRules = {
     ["Slack"] = {{
         substring = "",
         activityType = "Work"
+    }},
+    ["loginwindow"] = {{
+        substring = "",
+        activityType = "Idle"
+    }},
+    ["Obsidian"] = {{
+        substring = "",
+        activityType = "Obsidian"
+    }},
+    ["zoom.us"] = {{
+        substring = "",
+        activityType = "Obsidian"
     }}
 }
 
@@ -98,12 +110,10 @@ local function updateMouseDistance()
     lastMousePosition = currentMousePosition
 end
 
---- Logs information about the active window and resets counters.
--- @param windowName The name of the window.
--- @param frontmostProcess The name of the frontmost process.
--- @param activity The activity type.
+-- Move the counter reset logic to the `logWindowInfo` function right after logging is done
 local function logWindowInfo(windowName, frontmostProcess, activity)
     local file = io.open(logFilePath, "a")
+    hs.alert(frontmostProcess)
     if file then
         local logEntry = {
             ts = os.date("%Y-%m-%d %H:%M:%S"),
@@ -118,7 +128,7 @@ local function logWindowInfo(windowName, frontmostProcess, activity)
         file:write(jsonString .. "\n")
         file:close()
 
-        -- Resets counters after logging
+        -- Reset counters here ensures they are associated with the correct window
         keyPressCount = 0
         totalMouseDistance = 0
         mouseClicks = 0
@@ -137,28 +147,37 @@ local function checkActiveWindow()
         if app then
             local windowName = win:title()
             local frontmostProcess = app:name()
-            local windowInfo = windowName .. " - " .. frontmostProcess
-            if windowInfo ~= lastWindowInfo then
+            local currentWindowInfo = windowName .. " - " .. frontmostProcess
+            -- Check if the window information has changed
+            if currentWindowInfo ~= lastWindowInfo then
+                -- Log the information for the previous window before updating lastWindowInfo
                 if lastWindowInfo then
-                    logWindowInfo(windowName, frontmostProcess, activityType(frontmostProcess, windowName))
+                    logWindowInfo(lastWindowName, lastFrontmostProcess, lastActivityType)
                 end
-                lastWindowInfo = windowInfo
+                -- Update the information for the current window
+                lastWindowName = windowName
+                lastFrontmostProcess = frontmostProcess
+                lastActivityType = activityType(frontmostProcess, windowName)
+                lastWindowInfo = currentWindowInfo
             end
         end
     end
+    -- Reset counters after logging but outside the condition checking for window change
+    -- This ensures counters are ready for accumulation for the next window.
 end
 
 --- Keyboard event handler for counting key presses.
-hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
+keys = hs.eventtap.new({hs.eventtap.event.types.keyDown}, function(event)
     keyPressCount = keyPressCount + 1
     return false
 end):start()
 
 --- Mouse event handler for counting clicks.
-hs.eventtap.new({hs.eventtap.event.types.leftMouseDown, hs.eventtap.event.types.rightMouseDown}, function(event)
-    mouseClicks = mouseClicks + 1
-    return false
-end):start()
+mouses = hs.eventtap.new({hs.eventtap.event.types.leftMouseDown, hs.eventtap.event.types.rightMouseDown},
+    function(event)
+        mouseClicks = mouseClicks + 1
+        return false
+    end):start()
 
 --- Global timer to prevent garbage collection, important for long-running scripts.
 globalTimer = hs.timer.doEvery(0.1, checkActiveWindow):start()
