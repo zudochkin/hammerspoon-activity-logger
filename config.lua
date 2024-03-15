@@ -1,6 +1,11 @@
 -- config.lua
 local config = {}
 
-config.logFilePath = ""
+config.activityLogger = {}
+
+-- activityLogger
+config.activityLogger.logFilePath = ""
+config.activityLogger.dpi = 160
+-- /activityLogger
 
 return config
